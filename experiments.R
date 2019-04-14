@@ -6,11 +6,12 @@ library(tidyverse)
 library(readr)
 library(readxl)
 library(GGally)
+
 library(magrittr)
 
 #initial data load
 df<-read_excel('data.xlsx')
-df$month<-format(as.Date(df$order_date), "%y-%m")
+df$month<-format(as.Date(df$order_date), "%y%m")
 df$day<-strftime(df$order_date,"%A")
 df<-df %>% select(order_date,country,orders,utr,month,day)
 is_wknd<-function(x){
@@ -21,9 +22,10 @@ is_wknd<-function(x){
   return(var)
 }
 df$is_wknd<-as.factor(sapply(df$day,is_wknd))
-
 #initializee dummies
+
 df_reg<-df %>% group_by(month,country) %>% summarise(mean(orders))
+
 for(level in unique(df_reg$country)){
   if(level=="Singapore"){
     }
@@ -35,7 +37,7 @@ for(level in unique(df_reg$country)){
   }
 }
 
-#initialise growth df
+#prepare df
 df_growths<-df_reg[FALSE,] %>% select(month,country,`mean(orders)`)
 colnames(df_growths) = c("month","country","mean_order_growth")
 
@@ -63,9 +65,21 @@ for(c in unique(df_reg$country)){
 
 df_reg<-left_join(df_reg,df_growths,by=c("month","country"))
 df_reg<- df_reg %>%  select(month,country,mean_order_growth,dummy_Bangladesh,dummy_HK,dummy_Malaysia,dummy_Pakistan,dummy_Philippines,dummy_Taiwan,dummy_Thailand)
-df_reg$month<-as.factor(df_reg$month)
+df_reg<-df_reg %>% filter(month!="1804") #removes first month as no growth
+df_reg$month <- as.numeric(df_reg$month) #converts month to numeric for regression
+df_reg$country <- as.factor(df_reg$country) #converts country to factor
 
-df_reg
-l<-lm(mean_order_growth~month+dummy_Bangladesh+dummy_Thailand+dummy_Pakistan+dummy_HK+dummy_Malaysia+dummy_Philippines+dummy_Taiwan + month*dummy_Bangladesh+month*dummy_Thailand+month*dummy_Pakistan+month*dummy_HK+dummy_Malaysia+month*dummy_Philippines+month*dummy_Taiwan,data=df_reg)
-summary(l)
 
+#regressions
+
+encoded.lm<-lm(mean_order_growth~month+dummy_Bangladesh+dummy_Thailand+dummy_Pakistan+dummy_HK+dummy_Malaysia+dummy_Philippines+dummy_Taiwan + dummy_Bangladesh*month+dummy_Thailand*month+dummy_Pakistan*month+dummy_HK*month+dummy_Malaysia*month+dummy_Philippines*month+dummy_Taiwan*month,data=df_reg)
+
+normal.lm<-lm(mean_order_growth~month+country+country*month,data=df_reg)
+
+summary(encoded.lm)
+summary(normal.lm)
+AIC(encoded.lm)
+AIC(normal.lm)
+
+write.csv(df,file="cleaned_data.csv",row.names=FALSE)
+write.csv(df_reg,file="cleaned_growth_data.csv",row.names=FALSE)
