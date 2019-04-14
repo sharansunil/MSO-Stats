@@ -2,11 +2,9 @@ rm(list=ls())
 library(ggplot2)
 library(dplyr)
 library(tidyverse)
-
 library(readr)
 library(readxl)
 library(GGally)
-
 library(magrittr)
 
 #initial data load
@@ -63,6 +61,8 @@ for(c in unique(df_reg$country)){
   df_growths<-bind_rows(df_growths,dx_)
 }
 
+rm(list=c("dx_","d","c","level"))
+
 df_reg<-left_join(df_reg,df_growths,by=c("month","country"))
 df_reg<- df_reg %>%  select(month,country,mean_order_growth,dummy_Bangladesh,dummy_HK,dummy_Malaysia,dummy_Pakistan,dummy_Philippines,dummy_Taiwan,dummy_Thailand)
 df_reg<-df_reg %>% filter(month!="1804") #removes first month as no growth
@@ -70,16 +70,36 @@ df_reg$month <- as.numeric(df_reg$month) #converts month to numeric for regressi
 df_reg$country <- as.factor(df_reg$country) #converts country to factor
 
 
-#regressions
+#MoM order growth: month x country
 
-encoded.lm<-lm(mean_order_growth~month+dummy_Bangladesh+dummy_Thailand+dummy_Pakistan+dummy_HK+dummy_Malaysia+dummy_Philippines+dummy_Taiwan + dummy_Bangladesh*month+dummy_Thailand*month+dummy_Pakistan*month+dummy_HK*month+dummy_Malaysia*month+dummy_Philippines*month+dummy_Taiwan*month,data=df_reg)
+encoded.growth.lm<-lm(mean_order_growth~month+dummy_Bangladesh+dummy_Thailand+dummy_Pakistan+dummy_HK+dummy_Malaysia+dummy_Philippines+dummy_Taiwan + dummy_Bangladesh*month+dummy_Thailand*month+dummy_Pakistan*month+dummy_HK*month+dummy_Malaysia*month+dummy_Philippines*month+dummy_Taiwan*month,data=df_reg)
 
-normal.lm<-lm(mean_order_growth~month+country+country*month,data=df_reg)
+growth.lm<-lm(mean_order_growth~month+country+country*month,data=df_reg)
 
-summary(encoded.lm)
-summary(normal.lm)
-AIC(encoded.lm)
-AIC(normal.lm)
 
-write.csv(df,file="cleaned_data.csv",row.names=FALSE)
-write.csv(df_reg,file="cleaned_growth_data.csv",row.names=FALSE)
+summary(encoded.growth.lm)
+summary(growth.lm)
+AIC(encoded.growth.lm)
+AIC(growth.lm)
+plot(encoded.growth.lm)
+plot(growth.lm)
+
+#average daily orders: weekend x country x month
+df_wk<- df
+df_wk <- df_wk %>% group_by(country,month,is_wknd) %>% summarise(mean(orders))
+colnames(df_wk) <- c("country","month","is_wknd","mean_orders")
+df_wk$month <-as.numeric(df_wk$month)
+
+wkend.lm<-lm(mean_orders~month+country+is_wknd+country*is_wknd+country*month+is_wknd*month+month*is_wknd*country,data=df_wk)
+
+summary(wkend.lm)
+AIC(wkend.lm)
+plot(wkend.lm)
+
+
+#interaction plots
+df.int<-df %>% group_by(country,is_wknd) %>% summarise(mean(orders))
+colnames(df.int)<-c("country","is_wknd","mean_orders")
+
+country.weekend.int<-ggplot(df.int,aes(x=is_wknd,y=mean_orders,colour=country))+geom_line(aes(group=country))+geom_point()
+
