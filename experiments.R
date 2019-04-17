@@ -39,23 +39,21 @@ return(df)
 center_this <- function(x){
   (x - mean(x, na.rm=TRUE))
 }
-
-#DATA LOADING + CLEANING
+#DATA LOADING + CLEANING    
 df<-read_excel('data.xlsx')
-head(df)
 df<-frame_prep(df)
 
 #DATASET EXPLORATION
-qqplot(x=df$order_date,y=df$orders) #heavy tailed normal distribution
-ggplot(data=df,aes(x=country,y=orders,colour=country))+geom_boxplot()#boxplots to show data spread
+qqnorm(df$orders) #heavy tailed normal distribution
+ggplot(data=df,aes(x=country,y=orders,colour=country))+geom_boxplot() #boxplots to show data spread
 
 ###########REGRESSION: COUNTRY X TIME###########
 
 #DF PREP
-df_lm<-df %>% select(order_date,country,orders,order_date) #select fields
-df_lm<-df_lm %>% mutate(orders =center_this(orders)) #center orders
-df_lm$order_date<-scale(df_lm$order_date) #scale order dates
+df_lm<-df %>% select(order_date,country,orders) #select fields
+df_lm<-df_lm %>% mutate(order_date=scale(order_date)) #scale order dates
 
+#ggplot(df,aes(x=order_date,y=orders,colour=country,group=country)) +geom_line()
 #TRAIN/TEST SPLIT
 set.seed(101) # Set Seed so that same sample can be reproduced in future also
 # Now Selecting 75% of data as sample from total 'n' rows of the data  
@@ -67,10 +65,11 @@ df_lm<-df_lm_
 #PAIRWISE CORRELATIONS
 cor(df_lm$orders,df_lm$order_date) #shows little pairwise correl between day and orders
 pairwise.t.test(df_lm$orders, df_lm$country,p.adjust.method = "BH", pool.sd = FALSE)#heavy tailed normal so t test
+
 #day and country obviously unrelated
 
 #REGRESSION WITH INTERACTION ON TRAINING SET
-country.lm<-lm(orders~country*order_date,data=df_lm)
+country.lm<-lm(log(orders)~country*as.vector(order_date),data=df_lm)
 summary(country.lm)
 plot(country.lm) #plot 1 check for homoscedacity. plot 2 qqplot plot 3 smth. plot 4 als homoscedastic.
 car::vif(country.lm) ###results show no multicollinearity
@@ -78,22 +77,19 @@ AIC(country.lm)
 
 
 #REGRESSION WITHOUT INTERACTION ON TRAINING SET
-basiclm<-lm(orders~country+order_date,data=df_lm)
+basiclm<-lm(log(orders)~country+order_date,data=df_lm)
 summary(basiclm)
 car::vif(basiclm) ###results show no multicollinearity
 AIC(basiclm)
 plot(basiclm)
 
-#PREDICTION OF MODEL ON TEST SET
-set.seed(123)
-predicted_orders_country<-predict(country.lm,df_test)
-predicted_orders_basic<-predict(basiclm,df_test)
-test_eval<-cbind(df_test,predicted_orders_country,predicted_orders_basic) %>% sample_n(100)
-ggplot(test_eval,aes(x=order_date))+geom_line(aes(y=orders,colour="orders"))+geom_line(aes(y=predicted_orders_country,colour="predicted_orders_country"))+geom_line(aes(y=predicted_orders_basic,colour="predicted_orders_basic"))
-test_eval$res<-test_eval$orders-test_eval$predicted_orders
 
 #REGRESSION VIZ
+df_test <-df_test %>% sample_n(50)
+df_test$orders<-log(df_test$orders)
+df_test<-rbind(df_test,c(1.8,"Singapore",0))
+df_test$order_date<-as.numeric(df_test$order_date)
 ggplot(data=df_lm,aes(x=order_date,y=orders)) + geom_smooth(method='lm')
-predicted_df <- data.frame(order_pred = predict(country.lm, df_lm), order_date=df_lm$order_date)
-ggplot(df_lm,aes(x=order_date,y=orders,colour=country))+ geom_point() + geom_line(alpha=0.4,size=1,color='black',data = predicted_df, aes(x=order_date, y=order_pred)) 
+predicted_df <- data.frame(order_pred = predict(country.lm, df_test), order_date=df_test$order_date)
+\ggplot(df_test,aes(x=order_date,y=orders))+ geom_point(aes(colour=country)) + geom_line(alpha=0.9,size=1,colour="pink",data = predicted_df, aes(x=order_date, y=order_pred)) 
 
