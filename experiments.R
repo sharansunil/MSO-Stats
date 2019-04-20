@@ -82,8 +82,8 @@ df<-frame_prep(df)
 df<-df %>% select(order_date,country,orders,utr,day,is_wknd,time)
 #DATASET EXPLORATION
 qqnorm(df$orders) #qqplot heavy tailed normal distribution
-ggplot(data=df,aes(x=country,y=orders,colour=country))+geom_boxplot() #boxplot country x orders
-ggplot(data=df,aes(x=order_date,y=orders,colour=country))+geom_point()
+ggplot(data=df,aes(x=country,y=orders,colour=country))+geom_boxplot()+theme(axis.text.y = element_blank(),axis.ticks.y = element_blank())+labs(title="BoxPlot for each country in foodpanda APAC Apr'18-Apr'19") #boxplot country x orders
+ggplot(data=df,aes(x=order_date,y=orders,colour=country))+geom_point()+theme(axis.text.y = element_blank(),axis.ticks.y = element_blank())+labs(title="Scatter Plot foodpanda APAC between Apr'18-Apr'19") 
 ggplot(data=df,aes(x=is_wknd,y=orders))+geom_boxplot() #boxplot weekend x orders
 ###########REGRESSION: WKND X COUNTRY X TIME###########
 
@@ -127,7 +127,7 @@ df_19$month<-strftime(df_19$date,"%m") #gets month
 
 msodata<-df_19 %>% group_by(month,country) %>% summarise(sum(fit),sum(lwr),sum(upr)) #output data for mso
 colnames(msodata)<-c("month","country","fit","lwr","upr")
-ggplot(msodata %>% filter(country=="Singapore"),aes(x=month,group=country))+geom_line(aes(y=fit,color="fit")) +geom_line(aes(y=lwr,color="lower"),linetype='longdash')+geom_line(aes(y=upr,colour="upper"),linetype="longdash")+labs(x="month",y="predicted orders",title="2019 Prediction of orders for Singapore at 95%PI",color="Prediction Line") #plot SG 2019predictions with PI
+ggplot(msodata %>% filter(country=="Singapore"),aes(x=month,group=country))+geom_line(aes(y=fit,color="fit")) +geom_line(aes(y=lwr,color="lower"),linetype='longdash')+geom_line(aes(y=upr,colour="upper"),linetype="longdash")+labs(x="month",y="predicted orders",title="2019 Prediction of orders for Singapore at 95%PI",color="Prediction Line") +theme(axis.text.y = element_blank(),axis.ticks.y = element_blank())#plot SG 2019predictions with PI
 ggplot(msodata,aes(x=month,y=fit,colour=country))+geom_point()
 write.csv(msodata,"mso_2019_data.csv")
        
