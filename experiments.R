@@ -5,7 +5,7 @@ library(tidyverse)
 library(readxl)
 library(magrittr)
 library(car)
-
+library(broom)
 
 ##HELPER FUNCTIONS
 is_wknd<-function(x){
@@ -81,9 +81,12 @@ df<-read_excel('data.xlsx')
 df<-frame_prep(df)
 df<-df %>% select(order_date,country,orders,utr,day,is_wknd,time)
 #DATASET EXPLORATION
+
+
+
 qqnorm(df$orders) #qqplot heavy tailed normal distribution
-ggplot(data=df,aes(x=country,y=orders,colour=country))+geom_boxplot()+theme(axis.text.y = element_blank(),axis.ticks.y = element_blank())+labs(title="BoxPlot for each country in foodpanda APAC Apr'18-Apr'19") #boxplot country x orders
-ggplot(data=df,aes(x=order_date,y=orders,colour=country))+geom_point()+theme(axis.text.y = element_blank(),axis.ticks.y = element_blank())+labs(title="Scatter Plot foodpanda APAC between Apr'18-Apr'19") 
+ggplot(data=df,aes(x=country,y=scale(orders,scale=FALSE),colour=country))+geom_boxplot()+theme(axis.text.y = element_blank(),axis.ticks.y = element_blank(),axis.text.x=element_blank(),axis.ticks.x = element_blank())+labs(title="BoxPlot for each country in foodpanda APAC",y="orders") #boxplot country x orders
+ggplot(data=df,aes(x=order_date,y=orders,colour=country))+geom_point()+theme(axis.text.y = element_blank(),axis.ticks.y = element_blank(),axis.title.x=element_blank())+labs(title="Scatter Plot foodpanda APAC Apr'18-Apr'19") 
 ggplot(data=df,aes(x=is_wknd,y=orders))+geom_boxplot() #boxplot weekend x orders
 ###########REGRESSION: WKND X COUNTRY X TIME###########
 
@@ -91,9 +94,10 @@ ggplot(data=df,aes(x=is_wknd,y=orders))+geom_boxplot() #boxplot weekend x orders
 df_lm<-df %>% select(order_date,country,orders,is_wknd) #select fields
 df_lm$real_order_date<-df_lm$order_date
 df_lm<-df_lm %>% mutate(order_date=as.vector(scale(order_date)))#scale order dates
+df_lm$country<-relevel(df_lm$country,ref="Philippines")
 #PAIRWISE CORRELATIONS
 cor(df_lm$orders,df_lm$order_date) #shows little pairwise correl between day and orders
-pairwise.t.test(df_lm$orders, df_lm$country,p.adjust.method = "BH", pool.sd = TRUE)#heavy tailed normal so t test
+pairwise.t.test(df_lm$orders, df_lm$country,p.adjust.method = "BH", pool.sd = TRUE)#normal so t test
 pairwise.t.test(df_lm$orders,df_lm$is_wknd,p.adjust.method = "BH", pool.sd = FALSE)
 
 #REGRESSIONS
@@ -104,16 +108,16 @@ lm_three_way<-lm(orders~country*order_date*is_wknd,data=df_lm)
 summary(lm_no_int)
 summary(lm_int)
 summary(lm_log_int)
-summary(lm_three_way)
+sumdf<-summary(lm_three_way)
 plot(lm_no_int)
 plot(lm_int)
 plot(lm_log_int)
-plot(lm_three_way,1)
+plot(lm_three_way)
 AIC(lm_no_int,lm_int,lm_log_int,lm_three_way)
 car::vif(lm_no_int)
 car::vif(lm_int)
 car::vif(lm_log_int)
-car::vif(lm_three_way)
+car::vif(lm_three_way)[,c(2,3)]
 
 #REGRESSION VIZ
 
@@ -130,4 +134,9 @@ colnames(msodata)<-c("month","country","fit","lwr","upr")
 ggplot(msodata %>% filter(country=="Singapore"),aes(x=month,group=country))+geom_line(aes(y=fit,color="fit")) +geom_line(aes(y=lwr,color="lower"),linetype='longdash')+geom_line(aes(y=upr,colour="upper"),linetype="longdash")+labs(x="month",y="predicted orders",title="2019 Prediction of orders for Singapore at 95%PI",color="Prediction Line") +theme(axis.text.y = element_blank(),axis.ticks.y = element_blank())#plot SG 2019predictions with PI
 ggplot(msodata,aes(x=month,y=fit,colour=country))+geom_point()
 write.csv(msodata,"mso_2019_data.csv")
-       
+msodata
+
+#interaction plot
+df_int_plt<-df %>% group_by(country,is_wknd) %>% summarise(mean(orders))
+df_int_plt
+ggplot(df_int_plt,aes(x=is_wknd,y=`mean(orders)`,colour=country,group=country))+geom_point()+geom_line()+theme(axis.text.y = element_blank(),axis.ticks.y = element_blank())+labs(y="orders",x="is_weekend",title="Interaction plot between countries and weekend")
